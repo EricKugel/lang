@@ -1,7 +1,8 @@
 mod token;
 
 use std::fs;
-use token::Token;
+use token::token::Token;
+use token::operator::Operator;
 
 const valid_numbers: &str = "1234567890.";
 const valid_characters: &str = "+-/*^";
@@ -9,19 +10,7 @@ const pemdas: [&str; 3] = ["^", "*/", "+-"];
 
 fn main() {
     let code = fs::read_to_string("C:/Files/Rust/lang/main.lang").unwrap();
-    let a1: &str = &code[0..1];
-    let a2: &str = &code[2..];
-    let b1: i32 = a1.parse().unwrap();
-    let b2: i32 = a2.parse().unwrap();
-    let op: &str = &code[1..2];
-    let c = match op {
-        "+" => b1 + b2,
-        "-" => b1 - b2,
-        "*" => b1 * b2,
-        "/" => b1 / b2,
-        _ => 0
-    };
-    println!("{}", c);
+    println!("{}", solve(&mut parse_code(&code)));
 }
 
 fn parse_code(code: &str) -> Vec<Token> {
@@ -46,7 +35,7 @@ fn parse_code(code: &str) -> Vec<Token> {
                 }
                 object.push(Token::Number(token_str.to_string().parse().unwrap()));
             } else if valid_characters.contains(c) {
-                object.push(Token::Operator(c.to_string()));
+                object.push(Token::Operator(Operator::new(c)));
                 i += 1;
             }
         }
@@ -82,10 +71,45 @@ fn get_block_at(i: usize, code: &str) -> &str {
 }
 
 fn solve(tokens: &mut Vec<Token>) -> f64 {
-    for i in 0..tokens.len() {
-        if let Token::Block(child_tokens) = &tokens[i] {
-            tokens[i] = Token::Number(solve(&mut child_tokens));
+    for pemdas_index in 0..pemdas.len() {
+        let current_op = pemdas[pemdas_index];
+        let mut i = 0;
+        while i < tokens.len() - 2 {
+            if let Token::Operator(op) = &tokens[i + 1] {
+                if current_op.contains(&op.to_string()) {
+                    let mut first: &f64 = &0.0;
+                    let mut second: &f64 = &0.0;
+
+                    if let Token::Block(block) = &tokens[i] {
+                        tokens[i] = Token::Number(solve(&mut block));
+                    } if let Token::Block(block) = &tokens[i + 2] {
+                        tokens[i + 2] = Token::Number(solve(&mut block));
+                    }
+
+                    if let Token::Number(num) = &tokens[i] {
+                        first = num;
+                    } if let Token::Number(num) = &tokens[i + 2] {
+                        second = num;
+                    }
+                    
+                    let result = match op {
+                        Operator::Add => first + second,
+                        Operator::Subtract => first - second,
+                        Operator::Multiply => first * second,
+                        Operator::Divide => first / second,
+                        Operator::Exponent => first.powf(*second),
+                    };
+
+                    tokens = vec!(tokens[0..i], vec!(Token::Number(result))[0..1], tokens[i + 3..]);
+                    i -= 2;
+                }
+            }
+            i += 2;
         }
     }
-    unimplemented!();
+    if let Token::Number(num) = tokens[0] {
+        return num;
+    } else {
+        return 0.0;
+    }
 }
